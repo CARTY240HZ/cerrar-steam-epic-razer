@@ -1,0 +1,300 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>AXE · Cerrar lanzadores</title>
+<style>
+/* Mismo lenguaje visual que el panel de AXE, con el rojo del icono como acento. */
+:root{
+  --bg:#0E1013; --surface:#16191F; --surface-2:#1E232B; --surface-3:#242a34;
+  --line:#2A303B; --line-2:#333b47;
+  --fg:#E6EAF0; --muted:#98A2B3; --faint:#8B95A7;
+  --accent:#E5484D; --accent-hi:#EE5D62; --accent-dim:rgba(229,72,77,.12);
+  --green:#5FAF8D; --amber:#E0A32E; --red:#E5484D;
+  --ui:"Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+  --mono:ui-monospace,"Cascadia Code","Consolas",monospace;
+  --r:14px; --r-sm:10px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:14px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;overflow:hidden;user-select:none}
+.app{display:grid;grid-template-columns:236px 1fr;height:100vh}
+
+/* ---------- rail ---------- */
+.rail{background:linear-gradient(180deg,#12151b,#0f1217);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;padding:20px 14px;gap:4px}
+.brand{padding:6px 8px 2px}
+.brandmark{width:104px;height:auto;display:block}
+.ver{padding:8px 8px 14px;color:var(--faint);font-family:var(--mono);font-size:10.5px;letter-spacing:.3px}
+.nav-label{color:var(--faint);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;
+  padding:14px 10px 6px;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:var(--r-sm);
+  color:var(--muted);cursor:pointer;transition:background .18s ease,color .18s ease;font-weight:500;position:relative}
+.nav-item svg{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
+.nav-item:hover{background:var(--surface);color:var(--fg)}
+.nav-item.on{background:var(--accent-dim);color:var(--fg)}
+.nav-item.on::before{content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:3px;
+  border-radius:0 3px 3px 0;background:var(--accent)}
+.nav-item .kbd{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.nav-item.on .kbd{color:var(--accent-hi)}
+.rail-foot{margin-top:auto;padding:12px 10px 2px;border-top:1px solid var(--line);color:var(--faint);
+  font-family:var(--mono);font-size:10.5px;line-height:1.65}
+.rail-foot b{color:var(--green);font-weight:600}
+
+/* ---------- stage ---------- */
+.stage{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:14px;padding:14px 24px;border-bottom:1px solid var(--line);
+  background:rgba(14,16,19,.7)}
+.eco{display:flex;gap:7px;flex-wrap:wrap}
+.chip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface);
+  border:1px solid var(--line);padding:3px 9px;border-radius:999px;white-space:nowrap}
+.chip b{color:var(--fg);font-weight:600}
+.chip.hot b{color:var(--accent-hi)}
+.chip.admin{color:var(--amber);border-color:rgba(224,163,46,.3)}
+.pill{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--green);
+  background:rgba(95,175,141,.1);border:1px solid rgba(95,175,141,.28);padding:5px 11px;border-radius:999px;white-space:nowrap}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;
+  animation:breathe 2.6s ease-in-out infinite}
+.pill.busy{color:var(--amber);background:rgba(224,163,46,.1);border-color:rgba(224,163,46,.28)}
+.pill.hot{color:var(--accent-hi);background:var(--accent-dim);border-color:rgba(229,72,77,.3)}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.35}}
+
+.panel{padding:20px 24px 26px;overflow:auto;display:grid;gap:16px;grid-template-columns:repeat(3,1fr);align-content:start}
+.panel::-webkit-scrollbar{width:10px}
+.panel::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:3px solid var(--bg)}
+.phead{grid-column:span 3;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:2px}
+.phead h1{margin:0;font-size:22px;font-weight:650;letter-spacing:-.4px}
+.phead .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+.phead .clock{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right}
+.phead .clock b{color:var(--fg);font-size:15px;display:block;font-variant-numeric:tabular-nums}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 10px 30px -22px rgba(0,0,0,.7);
+  transition:border-color .2s ease,transform .2s cubic-bezier(.2,.7,.3,1),box-shadow .2s ease}
+.card:hover{border-color:var(--line-2);transform:translateY(-1px)}
+.card.flash{border-color:var(--accent)}
+.card h3{margin:0;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.span3{grid-column:span 3}
+
+/* grupos */
+.group{display:flex;flex-direction:column;gap:12px;min-height:250px}
+.ghead{display:flex;justify-content:space-between;align-items:center}
+.state{font-family:var(--mono);font-size:10px;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:6px;
+  border:1px solid var(--line);color:var(--faint)}
+.state.on{color:var(--accent-hi);border-color:rgba(229,72,77,.35);background:var(--accent-dim)}
+.count{display:flex;align-items:baseline;gap:8px}
+.count .v{font-family:var(--mono);font-size:34px;font-weight:700;letter-spacing:-1.5px;line-height:1;font-variant-numeric:tabular-nums}
+.count .l{color:var(--muted);font-size:12px}
+.group.idle .count .v{color:var(--faint)}
+.mem{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.procs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;flex:1}
+.procs li{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:11.5px;color:var(--muted);
+  padding:4px 8px;border-radius:7px;background:var(--surface-2)}
+.procs li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.procs li .x{color:var(--faint);flex:none}
+.procs li.prot .x{color:var(--amber)}
+.procs .empty{background:none;color:var(--faint);font-family:var(--ui);padding:4px 0}
+
+/* botones */
+.btn{border:1px solid var(--line);background:var(--surface-2);color:var(--fg);border-radius:var(--r-sm);
+  padding:11px 14px;cursor:pointer;font-family:var(--ui);text-align:left;display:flex;flex-direction:column;gap:1px;
+  transition:transform .18s ease,background .18s ease,border-color .18s ease,box-shadow .18s ease}
+.btn:hover{transform:translateY(-2px);border-color:var(--line-2);background:var(--surface-3)}
+.btn:active{transform:translateY(0)}
+.btn b{font-size:14px;font-weight:600}
+.btn span{font-size:11px;color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary span{color:rgba(255,255,255,.78)}
+.btn.primary:hover{background:var(--accent-hi);box-shadow:0 8px 24px -8px rgba(229,72,77,.6)}
+.btn.danger{border-color:rgba(229,72,77,.3);color:var(--accent-hi)}
+.btn.danger:hover{background:var(--accent-dim)}
+.btn.small{padding:8px 12px;align-items:center}
+.btn.small b{font-size:12.5px}
+.btn[disabled],.btn[disabled]:hover{opacity:.5;cursor:not-allowed;transform:none;background:var(--surface-2);
+  border-color:var(--line);box-shadow:none;color:var(--muted)}
+.btn.primary[disabled] span{color:var(--muted)}
+.btn.busy{opacity:.8;cursor:progress}
+.btn:focus-visible,.nav-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.actions{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
+.actions .btn{min-height:62px;justify-content:center}
+
+/* registro */
+.lhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.tally{display:flex;gap:7px}
+.tally .chip.ok b{color:var(--green)}
+.tally .chip.er b{color:var(--red)}
+.tally .chip.sk b{color:var(--amber)}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;max-height:230px;overflow:auto}
+.log::-webkit-scrollbar{width:8px}
+.log::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px}
+.log li{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;font-family:var(--mono);font-size:12px;
+  padding:6px 10px;border-radius:8px;background:var(--surface-2);animation:in .28s cubic-bezier(.2,.7,.3,1) both}
+@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.tag{font-size:10px;font-weight:700;text-align:center;padding:2px 0;border-radius:5px;letter-spacing:.5px}
+.tag.ok{color:var(--green);background:rgba(95,175,141,.12)}
+.tag.er{color:var(--red);background:var(--accent-dim)}
+.tag.sk{color:var(--amber);background:rgba(224,163,46,.12)}
+.log .why{color:var(--faint);font-size:11px}
+.log .empty{background:none;color:var(--faint);font-family:var(--ui);display:block;padding:6px 0;animation:none}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+  font-size:11.5px;color:var(--faint)}
+.foot b{color:var(--accent-hi);font-weight:700;letter-spacing:.5px}
+.link{background:none;border:0;padding:0;color:var(--muted);font-family:var(--mono);font-size:11px;cursor:pointer}
+.link:hover{color:var(--fg);text-decoration:underline}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand">%%BRANDMARK%%</div>
+    <div class="ver">v2.0 · cerrador de lanzadores</div>
+
+    <div class="nav-label">Lanzadores</div>
+    <div class="nav-item" data-go="steam" tabindex="0" role="button">
+      <svg viewBox="0 0 24 24"><circle cx="15.5" cy="8.5" r="3.5"/><circle cx="8" cy="16" r="2.5"/><path d="M10.2 14.8 13 11"/></svg>
+      <span>Steam</span><span class="kbd" id="n-steam">0</span>
+    </div>
+    <div class="nav-item" data-go="epic" tabindex="0" role="button">
+      <svg viewBox="0 0 24 24"><path d="M6 3h12v14l-6 4-6-4z"/><path d="M10 8h4M10 12h3"/></svg>
+      <span>Epic Games</span><span class="kbd" id="n-epic">0</span>
+    </div>
+    <div class="nav-item" data-go="razer" tabindex="0" role="button">
+      <svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v4"/></svg>
+      <span>Razer</span><span class="kbd" id="n-razer">0</span>
+    </div>
+
+    <div class="rail-foot">
+      Periféricos Razer <b>protegidos</b><br>
+      Registro en log.txt
+    </div>
+  </aside>
+
+  <main class="stage">
+    <div class="topbar">
+      <div class="eco">
+        <span class="chip" id="c-total">Procesos <b>0</b></span>
+        <span class="chip" id="c-mem">RAM <b>0 MB</b></span>
+        <span class="chip admin" id="c-admin" hidden>Administrador</span>
+      </div>
+      <div class="pill" id="pill"><span class="dot"></span><span id="pillT">Buscando…</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="phead">
+        <div><h1>Cerrar lanzadores</h1><div class="sub">Steam, Epic Games y Razer siguen abiertos en segundo plano. Ciérralos antes de jugar.</div></div>
+        <div class="clock">sesión<b id="clock">--:--</b></div>
+      </div>
+
+      <section class="card group idle" id="g-steam"></section>
+      <section class="card group idle" id="g-epic"></section>
+      <section class="card group idle" id="g-razer"></section>
+
+      <section class="card span3">
+        <div class="actions">
+          <button class="btn primary" id="closeAll"><b>Cerrar todo</b><span id="closeAllSub">Nada que cerrar</span></button>
+          <button class="btn" id="refresh"><b>Actualizar</b><span>Volver a buscar procesos</span></button>
+          <button class="btn" id="admin"><b>Como administrador</b><span>Para servicios protegidos</span></button>
+        </div>
+      </section>
+
+      <section class="card span3">
+        <div class="lhead">
+          <h3>Registro de esta sesión</h3>
+          <div class="tally">
+            <span class="chip ok">OK <b id="t-ok">0</b></span>
+            <span class="chip er">Errores <b id="t-er">0</b></span>
+            <span class="chip sk">Omitidos <b id="t-sk">0</b></span>
+          </div>
+        </div>
+        <ul class="log" id="log"><li class="empty">Aún no has cerrado nada en esta sesión.</li></ul>
+        <div class="foot"><span>Made by <b>AXE</b></span><button class="link" id="openLog">Abrir log.txt</button></div>
+      </section>
+    </div>
+  </main>
+</div>
+<script>
+"use strict";
+const GROUPS=[["steam","Steam"],["epic","Epic Games"],["razer","Razer"]];
+const $=id=>document.getElementById(id);
+const send=o=>window.chrome.webview.postMessage(JSON.stringify(o));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const mb=b=>b>=1073741824?(b/1073741824).toFixed(1)+" GB":Math.round(b/1048576)+" MB";
+let busy=false, tally={ok:0,er:0,sk:0};
+
+const t0=Date.now();
+setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);$("clock").textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")},1000);
+
+function pill(kind,text){$("pill").className="pill"+(kind?" "+kind:"");$("pillT").textContent=text}
+
+function renderScan(d){
+  $("c-admin").hidden=!d.admin;
+  $("admin").hidden=d.admin;
+  let total=0,mem=0;
+  for(const [id,name] of GROUPS){
+    const g=d.groups.find(x=>x.id===id)||{procs:[],total:0,closable:0,mem:0};
+    total+=g.closable; mem+=g.mem;
+    $("n-"+id).textContent=g.closable;
+    document.querySelector('[data-go="'+id+'"]').classList.toggle("on",g.closable>0);
+    const el=$("g-"+id);
+    el.classList.toggle("idle",g.closable===0);
+    const rows=g.procs.length?g.procs.slice(0,6).map(p=>'<li class="'+(p.prot?"prot":"")+'"><span>'+esc(p.name)+'</span><span class="x">'+(p.prot?"protegido":"×"+p.count)+'</span></li>').join("")
+      +(g.procs.length>6?'<li class="empty">y '+(g.procs.length-6)+' más</li>':""):'<li class="empty">No hay nada abierto.</li>';
+    el.innerHTML='<div class="ghead"><h3>'+name+'</h3><span class="state '+(g.closable?"on":"")+'">'+(g.closable?"abierto":"cerrado")+'</span></div>'
+      +'<div><div class="count"><span class="v">'+g.closable+'</span><span class="l">'+(g.closable===1?"proceso":"procesos")+'</span></div>'
+      +'<div class="mem">'+mb(g.mem)+' de RAM</div></div>'
+      +'<ul class="procs">'+rows+'</ul>'
+      +'<button class="btn danger small" data-close="'+id+'"'+(g.closable&&!busy?"":" disabled")+'><b>Cerrar '+name+'</b></button>';
+  }
+  $("c-total").className="chip"+(total?" hot":"");
+  $("c-total").innerHTML="Procesos <b>"+total+"</b>";
+  $("c-mem").innerHTML="RAM <b>"+mb(mem)+"</b>";
+  $("closeAll").disabled=busy||total===0;
+  $("closeAllSub").textContent=total?total+(total===1?" proceso":" procesos")+" · libera "+mb(mem):"Nada que cerrar";
+  if(!busy) total?pill("hot",total+(total===1?" abierto":" abiertos")):pill("","Todo cerrado");
+}
+
+function renderResult(r){
+  busy=false;
+  const ul=$("log");
+  const empty=ul.querySelector(".empty"); if(empty) empty.remove();
+  if(!r.items.length){
+    ul.insertAdjacentHTML("afterbegin",'<li><span class="tag sk">--</span><span>Nada que cerrar</span><span class="why">ya estaba cerrado</span></li>');
+  }
+  const map={ok:["ok","OK"],err:["er","ER"],skip:["sk","--"]};
+  for(const it of r.items.slice().reverse()){
+    const [cls,txt]=map[it.status];
+    tally[cls]+=it.n||1;
+    ul.insertAdjacentHTML("afterbegin",'<li><span class="tag '+cls+'">'+txt+'</span><span>'+esc(it.name)+'</span><span class="why">'+esc(it.why||"")+'</span></li>');
+  }
+  $("t-ok").textContent=tally.ok;$("t-er").textContent=tally.er;$("t-sk").textContent=tally.sk;
+  for(const b of document.querySelectorAll(".btn.busy")) b.classList.remove("busy");
+  send({cmd:"scan"});
+}
+
+function close(group,btn){
+  if(busy) return;
+  busy=true; pill("busy","Cerrando…");
+  if(btn) btn.classList.add("busy");
+  for(const b of document.querySelectorAll("[data-close],#closeAll")) b.disabled=true;
+  send({cmd:"close",group});
+}
+
+document.addEventListener("click",e=>{
+  const c=e.target.closest("[data-close]"); if(c&&!c.disabled) close(c.dataset.close,c);
+  const n=e.target.closest("[data-go]");
+  if(n){const el=$("g-"+n.dataset.go);el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),700)}
+});
+document.addEventListener("keydown",e=>{const n=e.target.closest&&e.target.closest("[data-go]");if(n&&(e.key==="Enter"||e.key===" ")){e.preventDefault();n.click()}});
+$("closeAll").onclick=()=>close("all",$("closeAll"));
+$("refresh").onclick=()=>{if(!busy){pill("busy","Buscando…");send({cmd:"scan"})}};
+$("admin").onclick=()=>send({cmd:"elevate"});
+$("openLog").onclick=()=>send({cmd:"openLog"});
+
+window.chrome.webview.addEventListener("message",e=>{
+  const d=e.data;
+  if(d.type==="scan") renderScan(d);
+  else if(d.type==="result") renderResult(d);
+});
+setInterval(()=>{if(!busy&&!document.hidden) send({cmd:"scan"})},3000);
+send({cmd:"scan"});
+</script>
+</body></html>
