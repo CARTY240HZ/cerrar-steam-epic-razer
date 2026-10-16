@@ -48,8 +48,8 @@ static class Program
     static int RunGui()
     {
         var app = new Application();
-        app.ShutdownMode = ShutdownMode.OnMainWindowClose;
-        return app.Run(new MainWindow());
+        app.ShutdownMode = ShutdownMode.OnLastWindowClose;
+        return app.Run(new SplashWindow());
     }
 
     static Assembly ResolveEmbedded(object sender, ResolveEventArgs e)
@@ -65,6 +65,23 @@ static class Program
             loaded[file] = asm;
             return asm;
         }
+    }
+}
+
+// Registro de depuracion: solo con la variable de entorno AXE_DEBUG=1 (%LOCALAPPDATA%\AXE\CerrarLanzadores\debug.log).
+static class Dbg
+{
+    static readonly bool on = Environment.GetEnvironmentVariable("AXE_DEBUG") == "1";
+    static readonly Stopwatch clock = Stopwatch.StartNew();
+    public static void Log(string msg)
+    {
+        if (!on) return;
+        try
+        {
+            Directory.CreateDirectory(Program.DataDir);
+            File.AppendAllText(Path.Combine(Program.DataDir, "debug.log"), clock.ElapsedMilliseconds.ToString().PadLeft(6) + "  " + msg + Environment.NewLine);
+        }
+        catch { }
     }
 }
 
@@ -98,56 +115,269 @@ static class Embedded
     }
 }
 
-class MainWindow : Window
+// Arranque comun de los WebView2 de la pantalla de carga y del panel.
+static class WebHost
 {
-    readonly WebView2 web = new WebView2();
-    readonly JavaScriptSerializer json = new JavaScriptSerializer();
-    bool scanning;
-
-    public MainWindow()
+    static bool loaderReady;
+    // Una instancia por control: compartirla entre dos controles hace fallar el segundo (0x8007139F).
+    static CoreWebView2CreationProperties Props()
     {
-        Title = "AXE · Cerrar lanzadores";
-        Width = 1080; Height = 720;
-        MinWidth = 900; MinHeight = 600;
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        Background = new SolidColorBrush(Color.FromRgb(0x0E, 0x10, 0x13));
-
-        web.DefaultBackgroundColor = System.Drawing.Color.FromArgb(0x0E, 0x10, 0x13);
-        web.CreationProperties = new CoreWebView2CreationProperties { UserDataFolder = Path.Combine(Program.DataDir, "wv2") };
-        Content = web;
-
-        SourceInitialized += delegate { DarkTitleBar(); };
-        Loaded += OnLoaded;
+        return new CoreWebView2CreationProperties { UserDataFolder = Path.Combine(Program.DataDir, "wv2") };
     }
 
-    async void OnLoaded(object sender, RoutedEventArgs e)
+    public static WebView2CompositionControl Create()
     {
-        try
-        {
-            string loaderDir = Path.GetDirectoryName(Embedded.Extract("WebView2Loader.dll", Path.Combine(Program.DataDir, "bin")));
-            CoreWebView2Environment.SetLoaderDllFolderPath(loaderDir);
-            await web.EnsureCoreWebView2Async(null);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this,
-                "No se pudo abrir la ventana (falta WebView2 o no arranca).\nSe abrira el modo consola.\n\n" + ex.Message,
-                "AXE · Cerrar lanzadores", MessageBoxButton.OK, MessageBoxImage.Warning);
-            ConsoleMode.Start();
-            Close();
-            return;
-        }
+        var web = new WebView2CompositionControl();
+        web.DefaultBackgroundColor = System.Drawing.Color.FromArgb(0x0E, 0x10, 0x13);
+        web.CreationProperties = Props();
+        return web;
+    }
 
-        CoreWebView2Settings s = web.CoreWebView2.Settings;
+    static void PrepareLoader()
+    {
+        if (loaderReady) return;
+        string loaderDir = Path.GetDirectoryName(Embedded.Extract("WebView2Loader.dll", Path.Combine(Program.DataDir, "bin")));
+        CoreWebView2Environment.SetLoaderDllFolderPath(loaderDir);
+        loaderReady = true;
+    }
+
+    static void Lock(CoreWebView2 core)
+    {
+        CoreWebView2Settings s = core.Settings;
         s.AreDefaultContextMenusEnabled = false;
         s.AreDevToolsEnabled = false;
         s.IsStatusBarEnabled = false;
         s.IsZoomControlEnabled = false;
         s.AreBrowserAcceleratorKeysEnabled = false;
+    }
+
+    public static async Task Init(WebView2CompositionControl web)
+    {
+        PrepareLoader();
+        await web.EnsureCoreWebView2Async(null);
+        Lock(web.CoreWebView2);
+    }
+
+    public static string Page(string name)
+    {
+        return Embedded.Text(name)
+            .Replace("%%BRANDMARK%%", Embedded.Text("brandmark.svg"))
+            .Replace("%%XMARK%%", Embedded.Text("xmark.svg"));
+    }
+
+    // Sin WebView2 no hay ventana: se avisa y se abre el .bat clasico.
+    public static void Fail(Window owner, Exception ex)
+    {
+        // Sin propietario: el panel puede estar fuera de pantalla y el aviso quedaria oculto.
+        MessageBox.Show(
+            "No se pudo abrir la ventana (falta WebView2 o no arranca).\nSe abrira el modo consola.\n\n" + ex.Message,
+            "AXE · Cerrar lanzadores", MessageBoxButton.OK, MessageBoxImage.Warning);
+        ConsoleMode.Launch();
+        Application.Current.Shutdown();
+    }
+
+    [DllImport("dwmapi.dll")]
+    static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+    // DWMWA_CLOAK: la ventana sigue pintandose pero no se ve ni recibe clics. Se usa para preparar el
+    // panel mientras se ve el loader (WPF quita WS_EX_LAYERED, asi que el alfa 0 no servia y el panel
+    // tapaba el loader; moverla desde fuera de pantalla daba un fotograma en blanco).
+    public static void Hide(Window w)
+    {
+        int v = 1;
+        DwmSetWindowAttribute(new WindowInteropHelper(w).Handle, 13, ref v, 4);
+    }
+
+    public static void Show(Window w)
+    {
+        int v = 0;
+        DwmSetWindowAttribute(new WindowInteropHelper(w).Handle, 13, ref v, 4);
+    }
+
+    public static void DarkFrame(Window w, bool roundCorners = false)
+    {
+        IntPtr hwnd = new WindowInteropHelper(w).Handle;
+        int on = 1;
+        DwmSetWindowAttribute(hwnd, 20, ref on, 4);      // DWMWA_USE_IMMERSIVE_DARK_MODE
+        int caption = 0x0013100E;                        // #0E1013 en COLORREF (0x00BBGGRR)
+        DwmSetWindowAttribute(hwnd, 35, ref caption, 4); // DWMWA_CAPTION_COLOR (Windows 11)
+        if (roundCorners)
+        {
+            int round = 2;                                 // DWMWCP_ROUND
+            DwmSetWindowAttribute(hwnd, 33, ref round, 4); // DWMWA_WINDOW_CORNER_PREFERENCE
+        }
+    }
+}
+
+// Loader en ventana pequeña con la animacion del de Flow. Los pasos de la barra son reales:
+// busca procesos y carga el panel oculto; al terminar se funde y aparece el panel.
+class SplashWindow : Window
+{
+    readonly WebView2CompositionControl web = WebHost.Create();
+    readonly TaskCompletionSource<bool> introDone = new TaskCompletionSource<bool>();
+    readonly TaskCompletionSource<bool> finished = new TaskCompletionSource<bool>();
+    bool started;
+
+    public SplashWindow()
+    {
+        Title = "AXE";
+        Width = 520; Height = 320;
+        WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.NoResize;
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        Background = new SolidColorBrush(Color.FromRgb(0x11, 0x10, 0x13));
+        Content = web;
+
+        SourceInitialized += delegate { WebHost.DarkFrame(this, true); };
+        Loaded += OnLoaded;
+    }
+
+    async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        Dbg.Log("splash loaded");
+        try { await WebHost.Init(web); }
+        catch (Exception ex) { Dbg.Log("splash init fail " + ex); WebHost.Fail(this, ex); return; }
+        Dbg.Log("splash webview ok");
+
+        // El control se ve cuando la pagina ya ha pintado: sin destello negro al abrir.
+        ((UIElement)web).Opacity = 0;
+        web.CoreWebView2.NavigationCompleted += delegate { ((UIElement)web).Opacity = 1; };
+        web.CoreWebView2.WebMessageReceived += OnMessage;
+        web.CoreWebView2.NavigateToString(WebHost.Page("splash.html"));
+    }
+
+    void OnMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        string msg = e.TryGetWebMessageAsString();
+        Dbg.Log("splash msg " + msg);
+        if (msg == "ready" && !started) { started = true; Run(); }
+        else if (msg == "intro-done") introDone.TrySetResult(true);
+        else if (msg == "flown") finished.TrySetResult(true);
+        else if (msg == "skip") introDone.TrySetResult(true);
+        else if (msg == "drag")
+        {
+            try { DragMove(); } catch (InvalidOperationException) { /* el boton ya se habia soltado */ }
+        }
+    }
+
+    async void Run()
+    {
+        Step("Iniciando…", 12);
+        await Task.Delay(900);
+
+        Step("Buscando procesos…", 34);
+        int open = await Task.Run(() => Launchers.OpenCount());
+        await Task.Delay(500);
+        Step(open == 0 ? "Nada abierto" : open + (open == 1 ? " proceso abierto" : " procesos abiertos"), 52);
+
+        var main = new MainWindow(true);
+        var ready = new TaskCompletionSource<bool>();
+        main.Ready += delegate { ready.TrySetResult(true); };
+        main.Show();
+        Dbg.Log("main shown");
+        await Task.Delay(400);
+        Step("Cargando interfaz…", 76);
+        await Task.WhenAll(Task.WhenAny(ready.Task, Task.Delay(15000)), Task.WhenAny(introDone.Task, Task.Delay(8000)));
+        await Task.Delay(500);
+
+        Dbg.Log("waits done ready=" + ready.Task.IsCompleted + " intro=" + introDone.Task.IsCompleted);
+        Step("Listo", 100);
+        await Task.Delay(650);
+
+        Post(new { type = "fly" });
+        await Task.WhenAny(finished.Task, Task.Delay(2000));
+
+        main.Reveal();
+        main.IntroDone();
+        main.Activate();
+#if UITEST
+        // Solo en la compilacion de prueba (/define:UITEST): ejecuta JS para comprobar la interfaz.
+        string testJs = Environment.GetEnvironmentVariable("AXE_TEST_JS");
+        if (!string.IsNullOrEmpty(testJs)) main.TestScript(testJs);
+#endif
+        Close();
+    }
+
+    void Step(string text, int pct)
+    {
+        Post(new { type = "step", text = text, pct = pct });
+    }
+
+    void Post(object data)
+    {
+        if (web.CoreWebView2 != null) web.CoreWebView2.PostWebMessageAsJson(new JavaScriptSerializer().Serialize(data));
+    }
+}
+
+class MainWindow : Window
+{
+    readonly WebView2CompositionControl web = WebHost.Create();
+    readonly JavaScriptSerializer json = new JavaScriptSerializer();
+    bool scanning;
+    bool readyRaised;
+
+    // Se lanza cuando la interfaz ya esta pintada (la pantalla de carga espera a esto).
+    public event Action Ready;
+
+    public MainWindow(bool hidden)
+    {
+        Title = "AXE · Cerrar lanzadores";
+        Width = 1080; Height = 720;
+        MinWidth = 900; MinHeight = 600;
+        Background = new SolidColorBrush(Color.FromRgb(0x0E, 0x10, 0x13));
+        Content = web;
+
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        if (hidden)
+        {
+            // Se crea ya en su sitio pero encubierta (ver WebHost.Hide).
+            ShowActivated = false;
+            ShowInTaskbar = false;
+        }
+
+        SourceInitialized += delegate
+        {
+            WebHost.DarkFrame(this);
+            if (hidden) WebHost.Hide(this);
+        };
+        Loaded += OnLoaded;
+    }
+
+    public void Reveal()
+    {
+        ShowInTaskbar = true;
+        WebHost.Show(this);
+    }
+
+#if UITEST
+    public async void TestScript(string js)
+    {
+        await Task.Delay(1500);
+        if (web.CoreWebView2 != null) await web.CoreWebView2.ExecuteScriptAsync(js);
+    }
+#endif
+
+    public void IntroDone()
+    {
+        if (web.CoreWebView2 != null) web.CoreWebView2.ExecuteScriptAsync("window.axeIntroDone&&window.axeIntroDone()");
+    }
+
+    async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        Dbg.Log("main loaded");
+        try { await WebHost.Init(web); }
+        catch (Exception ex) { Dbg.Log("main init fail " + ex); WebHost.Fail(this, ex); return; }
+        Dbg.Log("main webview ok");
 
         web.CoreWebView2.WebMessageReceived += OnMessage;
-        string html = Embedded.Text("ui.html").Replace("%%BRANDMARK%%", Embedded.Text("brandmark.svg"));
-        web.NavigateToString(html);
+        web.CoreWebView2.NavigationCompleted += delegate
+        {
+            Dbg.Log("main nav completed");
+            if (readyRaised) return;
+            readyRaised = true;
+            if (Ready != null) Ready();
+        };
+        web.CoreWebView2.NavigateToString(WebHost.Page("ui.html"));
     }
 
     async void OnMessage(object sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -195,18 +425,6 @@ class MainWindow : Window
             Close();
         }
         catch (Win32Exception) { /* el usuario ha cancelado el UAC */ }
-    }
-
-    [DllImport("dwmapi.dll")]
-    static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
-
-    void DarkTitleBar()
-    {
-        IntPtr hwnd = new WindowInteropHelper(this).Handle;
-        int on = 1;
-        DwmSetWindowAttribute(hwnd, 20, ref on, 4);      // DWMWA_USE_IMMERSIVE_DARK_MODE
-        int caption = 0x0013100E;                        // #0E1013 en COLORREF (0x00BBGGRR)
-        DwmSetWindowAttribute(hwnd, 35, ref caption, 4); // DWMWA_CAPTION_COLOR (Windows 11)
     }
 }
 
@@ -258,6 +476,11 @@ static class Launchers
     {
         using (WindowsIdentity id = WindowsIdentity.GetCurrent())
             return new WindowsPrincipal(id).IsInRole(WindowsBuiltInRole.Administrator);
+    }
+
+    public static int OpenCount()
+    {
+        return Snapshot().Count(p => !p.Protected);
     }
 
     public static object Scan()
@@ -398,9 +621,11 @@ static class ConsoleMode
         finally { try { File.Delete(bat); } catch { } }
     }
 
-    public static void Start()
+    // Abre la consola sin esperar (la ventana se va a cerrar). El .bat temporal queda en %TEMP%.
+    public static void Launch()
     {
-        Task.Run(() => Run());
+        string bat = ExtractBat();
+        Process.Start(new ProcessStartInfo("cmd.exe", "/c \"\"" + bat + "\"\"") { UseShellExecute = true });
     }
 }
 
