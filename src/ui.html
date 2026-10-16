@@ -1,7 +1,8 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8">
 <title>AXE · Cerrar lanzadores</title>
 <style>
-/* Mismo lenguaje visual que el panel de AXE, con el rojo del icono como acento. */
+/* Mismo lenguaje visual que el panel de AXE, con el rojo del icono como acento.
+   Movimiento: solo transform y opacity (y filter breve), curvas propias, salidas mas rapidas que entradas. */
 :root{
   --bg:#0E1013; --surface:#16191F; --surface-2:#1E232B; --surface-3:#242a34;
   --line:#2A303B; --line-2:#333b47;
@@ -11,9 +12,12 @@
   --ui:"Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
   --mono:ui-monospace,"Cascadia Code","Consolas",monospace;
   --r:14px; --r-sm:10px;
+  --ease-out:cubic-bezier(.23,1,.32,1);
+  --ease-io:cubic-bezier(.77,0,.175,1);
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
+html{color-scheme:dark}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:14px;line-height:1.45;
   -webkit-font-smoothing:antialiased;overflow:hidden;user-select:none}
@@ -27,95 +31,151 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--ui);font-si
 .ver{padding:8px 8px 14px;color:var(--faint);font-family:var(--mono);font-size:10.5px;letter-spacing:.3px}
 .nav-label{color:var(--faint);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;
   padding:14px 10px 6px;font-weight:600}
-.nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:var(--r-sm);
-  color:var(--muted);cursor:pointer;transition:background .18s ease,color .18s ease;font-weight:500;position:relative}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;min-height:40px;width:100%;border-radius:var(--r-sm);
+  border:0;background:transparent;font:inherit;text-align:left;
+  color:var(--muted);cursor:pointer;font-weight:500;position:relative;
+  transition:background-color .2s ease,color .2s ease,transform .16s var(--ease-out)}
+.nav-item:active{transform:scale(.98)}
 .nav-item svg{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7}
-.nav-item:hover{background:var(--surface);color:var(--fg)}
 .nav-item.on{background:var(--accent-dim);color:var(--fg)}
-.nav-item.on::before{content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:3px;
-  border-radius:0 3px 3px 0;background:var(--accent)}
-.nav-item .kbd{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+/* indicador lateral: siempre presente, crece al activarse */
+.nav-item::before{content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;
+  background:var(--accent);opacity:0;transform:scaleY(.3);transition:opacity .22s ease,transform .3s var(--ease-out)}
+.nav-item.on::before{opacity:1;transform:none}
+.nav-item .kbd{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums;
+  transition:color .2s ease}
 .nav-item.on .kbd{color:var(--accent-hi)}
 .rail-foot{margin-top:auto;padding:12px 10px 2px;border-top:1px solid var(--line);color:var(--faint);
   font-family:var(--mono);font-size:10.5px;line-height:1.65}
 .rail-foot b{color:var(--green);font-weight:600}
 
 /* ---------- stage ---------- */
-.stage{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.stage{display:flex;flex-direction:column;min-width:0;overflow:hidden;
+  background:radial-gradient(900px 360px at 72% -140px,rgba(229,72,77,.08),transparent 70%),var(--bg)}
 .topbar{display:flex;align-items:center;gap:14px;padding:14px 24px;border-bottom:1px solid var(--line);
   background:rgba(14,16,19,.7)}
 .eco{display:flex;gap:7px;flex-wrap:wrap}
 .chip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--surface);
-  border:1px solid var(--line);padding:3px 9px;border-radius:999px;white-space:nowrap}
-.chip b{color:var(--fg);font-weight:600}
+  border:1px solid var(--line);padding:3px 9px;border-radius:999px;white-space:nowrap;
+  transition:border-color .2s ease,color .2s ease}
+.chip b{color:var(--fg);font-weight:600;font-variant-numeric:tabular-nums;transition:color .2s ease}
 .chip.hot b{color:var(--accent-hi)}
 .chip.admin{color:var(--amber);border-color:rgba(224,163,46,.3)}
 .pill{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--green);
-  background:rgba(95,175,141,.1);border:1px solid rgba(95,175,141,.28);padding:5px 11px;border-radius:999px;white-space:nowrap}
+  background:rgba(95,175,141,.1);border:1px solid rgba(95,175,141,.28);padding:5px 11px;border-radius:999px;white-space:nowrap;
+  transition:color .25s ease,background-color .25s ease,border-color .25s ease}
 .pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;
   animation:breathe 2.6s ease-in-out infinite}
 .pill.busy{color:var(--amber);background:rgba(224,163,46,.1);border-color:rgba(224,163,46,.28)}
+.pill.busy .dot{animation-duration:.9s}
 .pill.hot{color:var(--accent-hi);background:var(--accent-dim);border-color:rgba(229,72,77,.3)}
 @keyframes breathe{0%,100%{opacity:1}50%{opacity:.35}}
+.pill .dot{position:relative}
+.pill.hot .dot::after{content:"";position:absolute;inset:0;border-radius:50%;background:currentColor;animation:ping 1.8s var(--ease-out) infinite}
+@keyframes ping{0%{transform:scale(1);opacity:.55}80%,100%{transform:scale(2.8);opacity:0}}
 
-.panel{padding:20px 24px 26px;overflow:auto;display:grid;gap:16px;grid-template-columns:repeat(3,1fr);align-content:start}
+/* texto que cambia: fundido con un poco de desenfoque para que no se vean dos estados */
+.swap{display:inline-block;transition:opacity .16s ease,filter .16s ease,transform .16s var(--ease-out)}
+.swap.out{opacity:0;filter:blur(3px);transform:translateY(-2px)}
+
+.panel{padding:20px 24px 26px;overflow:auto;display:grid;gap:16px;grid-template-columns:repeat(3,1fr);grid-auto-rows:max-content;align-content:start;
+  scroll-behavior:smooth}
 .panel::-webkit-scrollbar{width:10px}
 .panel::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:3px solid var(--bg)}
 .phead{grid-column:span 3;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:2px}
-.phead h1{margin:0;font-size:22px;font-weight:650;letter-spacing:-.4px}
-.phead .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+.phead h1{margin:0;font-size:22px;font-weight:650;letter-spacing:-.4px;text-wrap:balance}
+.phead .sub{color:var(--muted);font-size:12.5px;margin-top:2px;text-wrap:pretty}
 .phead .clock{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right}
 .phead .clock b{color:var(--fg);font-size:15px;display:block;font-variant-numeric:tabular-nums}
 
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;position:relative;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 10px 30px -22px rgba(0,0,0,.7);
-  transition:border-color .2s ease,transform .2s cubic-bezier(.2,.7,.3,1),box-shadow .2s ease}
-.card:hover{border-color:var(--line-2);transform:translateY(-1px)}
-.card.flash{border-color:var(--accent)}
-.card h3{margin:0;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
+  transition:border-color .25s ease,box-shadow .25s ease,--so .45s ease}
+.card.flash{border-color:var(--accent);box-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 0 0 3px rgba(229,72,77,.12)}
+.card h2{margin:0;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);font-weight:600}
 .span3{grid-column:span 3}
 
 /* grupos */
 .group{display:flex;flex-direction:column;gap:12px;min-height:250px}
+/* brillo rojo muy tenue cuando hay algo abierto */
+.group::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;
+  background:radial-gradient(120% 80% at 0% 0%,rgba(229,72,77,.07),transparent 60%);transition:opacity .4s ease}
+.group.live::after{opacity:1}
 .ghead{display:flex;justify-content:space-between;align-items:center}
 .state{font-family:var(--mono);font-size:10px;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:6px;
-  border:1px solid var(--line);color:var(--faint)}
+  border:1px solid var(--line);color:var(--faint);transition:color .25s ease,border-color .25s ease,background-color .25s ease}
 .state.on{color:var(--accent-hi);border-color:rgba(229,72,77,.35);background:var(--accent-dim)}
 .count{display:flex;align-items:baseline;gap:8px}
-.count .v{font-family:var(--mono);font-size:34px;font-weight:700;letter-spacing:-1.5px;line-height:1;font-variant-numeric:tabular-nums}
+.count .v{font-family:var(--mono);font-size:34px;font-weight:700;letter-spacing:-1.5px;line-height:1;font-variant-numeric:tabular-nums;
+  transition:color .3s ease}
 .count .l{color:var(--muted);font-size:12px}
-.group.idle .count .v{color:var(--faint)}
-.mem{font-family:var(--mono);font-size:11px;color:var(--faint)}
-.procs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;flex:1}
+.group:not(.live) .count .v{color:var(--faint)}
+.mem{font-family:var(--mono);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.procs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;flex:1 0 auto;position:relative}
 .procs li{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:11.5px;color:var(--muted);
-  padding:4px 8px;border-radius:7px;background:var(--surface-2)}
-.procs li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  padding:4px 8px;border-radius:7px;background:var(--surface-2);
+  transition:opacity .28s var(--ease-out),transform .28s var(--ease-out),filter .28s ease}
+.procs li.enter{opacity:0;transform:translateY(4px)}
+.procs li.leave{opacity:0;transform:translateX(10px);filter:blur(2px);transition-duration:.2s}
+.procs li span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .procs li .x{color:var(--faint);flex:none}
 .procs li.prot .x{color:var(--amber)}
-.procs .empty{background:none;color:var(--faint);font-family:var(--ui);padding:4px 0}
+.procs li.empty{background:none;color:var(--faint);font-family:var(--ui);padding:4px 0;justify-content:flex-start;align-items:center}
+.eck{width:14px;height:14px;flex:none;stroke:var(--green);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:16;stroke-dashoffset:16;animation:draw .5s .15s var(--ease-out) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
 
 /* botones */
 .btn{border:1px solid var(--line);background:var(--surface-2);color:var(--fg);border-radius:var(--r-sm);
   padding:11px 14px;cursor:pointer;font-family:var(--ui);text-align:left;display:flex;flex-direction:column;gap:1px;
-  transition:transform .18s ease,background .18s ease,border-color .18s ease,box-shadow .18s ease}
-.btn:hover{transform:translateY(-2px);border-color:var(--line-2);background:var(--surface-3)}
-.btn:active{transform:translateY(0)}
+  position:relative;overflow:hidden;
+  transition:transform .16s var(--ease-out),background-color .2s ease,border-color .2s ease,box-shadow .2s ease,opacity .2s ease,color .2s ease}
+.btn:active:not([disabled]){transform:scale(.97)}
 .btn b{font-size:14px;font-weight:600}
 .btn span{font-size:11px;color:var(--muted)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.primary span{color:rgba(255,255,255,.78)}
-.btn.primary:hover{background:var(--accent-hi);box-shadow:0 8px 24px -8px rgba(229,72,77,.6)}
 .btn.danger{border-color:rgba(229,72,77,.3);color:var(--accent-hi)}
-.btn.danger:hover{background:var(--accent-dim)}
-.btn.small{padding:8px 12px;align-items:center}
+.btn.small{padding:8px 12px;min-height:40px;align-items:center;justify-content:center}
 .btn.small b{font-size:12.5px}
-.btn[disabled],.btn[disabled]:hover{opacity:.5;cursor:not-allowed;transform:none;background:var(--surface-2);
-  border-color:var(--line);box-shadow:none;color:var(--muted)}
+.group .btn{flex-shrink:0}
+@media (hover:hover) and (pointer:fine){
+  .nav-item:hover:not(.on){background:var(--surface);color:var(--fg)}
+  .card:hover{border-color:var(--line-2);--so:1}
+  .card.flash:hover{border-color:var(--accent)}
+  .btn:hover:not([disabled]){border-color:var(--line-2);background:var(--surface-3)}
+  .btn.primary:hover:not([disabled]){background:var(--accent-hi);border-color:var(--accent-hi);box-shadow:0 8px 24px -10px rgba(229,72,77,.6)}
+  .btn.danger:hover:not([disabled]){background:var(--accent-dim);border-color:rgba(229,72,77,.45)}
+  .link:hover{color:var(--fg)}
+}
+.btn[disabled]{opacity:.5;cursor:not-allowed;background:var(--surface-2);border-color:var(--line);box-shadow:none;color:var(--muted)}
 .btn.primary[disabled] span{color:var(--muted)}
-.btn.busy{opacity:.8;cursor:progress}
-.btn:focus-visible,.nav-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.actions{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
-.actions .btn{min-height:62px;justify-content:center}
+/* trabajando: barrido de luz continuo (lineal: es progreso, no un gesto) */
+.btn.busy{cursor:progress;opacity:1}
+.btn.busy::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.16) 50%,transparent 70%);
+  transform:translateX(-100%);animation:sweep 1.1s linear infinite}
+@keyframes sweep{to{transform:translateX(100%)}}
+/* confirmacion en el propio boton: primer clic arma, segundo cierra; la barra marca el tiempo que queda */
+.btn.armed{border-color:var(--accent-hi);box-shadow:0 0 0 3px rgba(229,72,77,.18)}
+.btn.primary.armed{background:#c93b40;border-color:#ff8a8e}
+.btn.armed::before{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:currentColor;opacity:.7;
+  transform-origin:left;animation:countdown 3s linear forwards}
+.btn.primary.armed::before{background:#fff}
+@keyframes countdown{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.btn:focus-visible,.nav-item:focus-visible,.link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.actions{display:flex;gap:12px}
+.actions .btn{flex:1;min-height:62px;flex-direction:row;align-items:center;gap:13px;padding:11px 16px}
+.btn .ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+.btn .tx,.btn.primary .tx{display:flex;flex-direction:column;gap:1px;min-width:0;font-size:inherit;color:inherit}
+.btn .tx>span{font-size:11px;color:var(--muted)}
+.btn.primary .tx>span{color:rgba(255,255,255,.78)}
+.btn.primary[disabled] .tx>span{color:var(--muted)}
+.btn kbd{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint);background:var(--surface);
+  border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;padding:1px 6px}
+#refresh.spin .ic{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.actions .btn.primary{flex:2}
 
 /* registro */
 .lhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
@@ -123,93 +183,143 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--ui);font-si
 .tally .chip.ok b{color:var(--green)}
 .tally .chip.er b{color:var(--red)}
 .tally .chip.sk b{color:var(--amber)}
-.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;max-height:230px;overflow:auto}
+.tally .chip.pop{animation:pop .5s var(--ease-out)}
+@keyframes pop{30%{transform:scale(1.08);border-color:var(--line-2)}}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;max-height:230px;overflow:auto;overscroll-behavior:contain}
 .log::-webkit-scrollbar{width:8px}
 .log::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px}
 .log li{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;font-family:var(--mono);font-size:12px;
-  padding:6px 10px;border-radius:8px;background:var(--surface-2);animation:in .28s cubic-bezier(.2,.7,.3,1) both}
-@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  padding:6px 10px;border-radius:8px;background:var(--surface-2);
+  transition:opacity .3s var(--ease-out),transform .3s var(--ease-out)}
+.log li.enter{opacity:0;transform:translateY(-6px)}
 .tag{font-size:10px;font-weight:700;text-align:center;padding:2px 0;border-radius:5px;letter-spacing:.5px}
 .tag.ok{color:var(--green);background:rgba(95,175,141,.12)}
 .tag.er{color:var(--red);background:var(--accent-dim)}
 .tag.sk{color:var(--amber);background:rgba(224,163,46,.12)}
 .log .why{color:var(--faint);font-size:11px}
-.log .empty{background:none;color:var(--faint);font-family:var(--ui);display:block;padding:6px 0;animation:none}
+.log li.empty{background:none;color:var(--faint);font-family:var(--ui);display:block;padding:6px 0}
 .foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
   font-size:11.5px;color:var(--faint)}
 .foot b{color:var(--accent-hi);font-weight:700;letter-spacing:.5px}
-.link{background:none;border:0;padding:0;color:var(--muted);font-family:var(--mono);font-size:11px;cursor:pointer}
-.link:hover{color:var(--fg);text-decoration:underline}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.link{background:none;border:0;padding:12px 8px;margin:-12px -8px;color:var(--muted);font-family:var(--mono);font-size:11px;cursor:pointer;transition:color .2s ease}
+
+/* ---------- foco de luz que sigue al cursor sobre las tarjetas ---------- */
+@property --so{syntax:"<number>";inherits:true;initial-value:0}
+.card{--mx:50%;--my:50%;
+  background:radial-gradient(520px circle at var(--mx) var(--my),rgba(255,255,255,calc(.03 * var(--so))),transparent 42%),var(--surface)}
+.card::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;pointer-events:none;opacity:var(--so);
+  background:radial-gradient(170px circle at var(--mx) var(--my),rgba(238,93,98,.5),transparent 75%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+/* tarjeta que acaba de quedar limpia */
+.card.done{border-color:rgba(95,175,141,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 0 0 3px rgba(95,175,141,.12)}
+
+/* ---------- aviso flotante con el resultado ---------- */
+.toast{position:fixed;left:calc(50% + 118px);bottom:26px;z-index:20;display:flex;align-items:center;gap:12px;padding:11px 18px 11px 12px;
+  background:rgba(30,35,43,.9);border:1px solid var(--line-2);border-radius:12px;font-size:13px;pointer-events:none;
+  box-shadow:0 18px 40px -12px rgba(0,0,0,.75);backdrop-filter:blur(12px);
+  opacity:0;filter:blur(4px);transform:translate(-50%,14px) scale(.96);
+  transition:opacity .2s ease,filter .2s ease,transform .22s ease}
+.toast.on{opacity:1;filter:none;transform:translate(-50%,0) scale(1);
+  transition:opacity .3s ease,filter .3s ease,transform .5s var(--ease-out)}
+.toast b{display:block;font-weight:600}
+.toast small{display:block;color:var(--muted);font-size:11.5px;margin-top:1px}
+.toast .ti{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex:none;
+  background:rgba(95,175,141,.14);color:var(--green)}
+.toast.er .ti{background:var(--accent-dim);color:var(--red)}
+.toast svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.toast .ck{stroke-dasharray:24;stroke-dashoffset:24}
+.toast.on .ck{stroke-dashoffset:0;transition:stroke-dashoffset .45s .15s var(--ease-out)}
+
+/* entrada desde el loader: escalonada, de arriba abajo */
+.brandmark{transition:opacity .3s ease}
+body.intro-brand .brandmark{opacity:0}
+.rise{transition:opacity .45s var(--ease-out),transform .55s var(--ease-out);transition-delay:calc(var(--i,0) * 45ms)}
+body.intro .rise{opacity:0;transform:translateY(8px)}
+
+/* Sin variante de movimiento reducido a proposito: el usuario lo pidio. Windows lo activa al quitar
+   los "efectos de animacion" (ajuste habitual para rendimiento en juegos) y dejaba la app casi sin movimiento. */
 </style></head>
-<body>
+<body class="intro intro-brand">
 <div class="app">
   <aside class="rail">
     <div class="brand">%%BRANDMARK%%</div>
-    <div class="ver">v2.0 · cerrador de lanzadores</div>
+    <div class="ver rise" style="--i:0">v2.0 · cerrador de lanzadores</div>
 
-    <div class="nav-label">Lanzadores</div>
-    <div class="nav-item" data-go="steam" tabindex="0" role="button">
-      <svg viewBox="0 0 24 24"><circle cx="15.5" cy="8.5" r="3.5"/><circle cx="8" cy="16" r="2.5"/><path d="M10.2 14.8 13 11"/></svg>
-      <span>Steam</span><span class="kbd" id="n-steam">0</span>
-    </div>
-    <div class="nav-item" data-go="epic" tabindex="0" role="button">
-      <svg viewBox="0 0 24 24"><path d="M6 3h12v14l-6 4-6-4z"/><path d="M10 8h4M10 12h3"/></svg>
-      <span>Epic Games</span><span class="kbd" id="n-epic">0</span>
-    </div>
-    <div class="nav-item" data-go="razer" tabindex="0" role="button">
-      <svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v4"/></svg>
-      <span>Razer</span><span class="kbd" id="n-razer">0</span>
-    </div>
+    <div class="nav-label rise" style="--i:1">Lanzadores</div>
+    <button class="nav-item rise" style="--i:2" data-go="steam" aria-label="Ir a Steam">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="15.5" cy="8.5" r="3.5"/><circle cx="8" cy="16" r="2.5"/><path d="M10.2 14.8 13 11"/></svg>
+      <span translate="no">Steam</span><span class="kbd" id="n-steam">0</span>
+    </button>
+    <button class="nav-item rise" style="--i:3" data-go="epic" aria-label="Ir a Epic Games">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v14l-6 4-6-4z"/><path d="M10 8h4M10 12h3"/></svg>
+      <span translate="no">Epic Games</span><span class="kbd" id="n-epic">0</span>
+    </button>
+    <button class="nav-item rise" style="--i:4" data-go="razer" aria-label="Ir a Razer">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="5"/><path d="M12 7v4"/></svg>
+      <span translate="no">Razer</span><span class="kbd" id="n-razer">0</span>
+    </button>
 
-    <div class="rail-foot">
+    <div class="rail-foot rise" style="--i:6">
       Periféricos Razer <b>protegidos</b><br>
       Registro en log.txt
     </div>
   </aside>
 
   <main class="stage">
-    <div class="topbar">
+    <div class="topbar rise" style="--i:0">
       <div class="eco">
-        <span class="chip" id="c-total">Procesos <b>0</b></span>
-        <span class="chip" id="c-mem">RAM <b>0 MB</b></span>
+        <span class="chip" id="c-total">Procesos <b id="c-total-n">0</b></span>
+        <span class="chip">RAM <b id="c-mem">0 MB</b></span>
         <span class="chip admin" id="c-admin" hidden>Administrador</span>
       </div>
-      <div class="pill" id="pill"><span class="dot"></span><span id="pillT">Buscando…</span></div>
+      <div class="pill" id="pill" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span class="swap" id="pillT">Buscando…</span></div>
     </div>
 
     <div class="panel">
-      <div class="phead">
+      <div class="phead rise" style="--i:1">
         <div><h1>Cerrar lanzadores</h1><div class="sub">Steam, Epic Games y Razer siguen abiertos en segundo plano. Ciérralos antes de jugar.</div></div>
-        <div class="clock">sesión<b id="clock">--:--</b></div>
+        <div class="clock">sesión<b id="clock">00:00</b></div>
       </div>
 
-      <section class="card group idle" id="g-steam"></section>
-      <section class="card group idle" id="g-epic"></section>
-      <section class="card group idle" id="g-razer"></section>
+      <section class="card group rise" style="--i:2" id="g-steam"></section>
+      <section class="card group rise" style="--i:3" id="g-epic"></section>
+      <section class="card group rise" style="--i:4" id="g-razer"></section>
 
-      <section class="card span3">
+      <section class="card span3 rise" style="--i:5">
         <div class="actions">
-          <button class="btn primary" id="closeAll"><b>Cerrar todo</b><span id="closeAllSub">Nada que cerrar</span></button>
-          <button class="btn" id="refresh"><b>Actualizar</b><span>Volver a buscar procesos</span></button>
-          <button class="btn" id="admin"><b>Como administrador</b><span>Para servicios protegidos</span></button>
+          <button class="btn primary" id="closeAll">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8"/><path d="M6.6 6.6a8 8 0 1 0 10.8 0"/></svg>
+            <span class="tx"><b>Cerrar todo</b><span class="swap" id="closeAllSub">Nada que cerrar</span></span>
+          </button>
+          <button class="btn" id="refresh" aria-keyshortcuts="R">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 4v6h-6"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L21 10"/></svg>
+            <span class="tx"><b>Actualizar</b><span>Volver a buscar procesos</span></span><kbd aria-hidden="true">R</kbd>
+          </button>
+          <button class="btn" id="admin">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+            <span class="tx"><b>Reiniciar como administrador</b><span>Para servicios protegidos</span></span>
+          </button>
         </div>
       </section>
 
-      <section class="card span3">
+      <section class="card span3 rise" style="--i:6">
         <div class="lhead">
-          <h3>Registro de esta sesión</h3>
+          <h2>Registro de esta sesión</h2>
           <div class="tally">
-            <span class="chip ok">OK <b id="t-ok">0</b></span>
-            <span class="chip er">Errores <b id="t-er">0</b></span>
-            <span class="chip sk">Omitidos <b id="t-sk">0</b></span>
+            <span class="chip ok" id="c-ok">OK <b id="t-ok">0</b></span>
+            <span class="chip er" id="c-er">Errores <b id="t-er">0</b></span>
+            <span class="chip sk" id="c-sk">Omitidos <b id="t-sk">0</b></span>
           </div>
         </div>
-        <ul class="log" id="log"><li class="empty">Aún no has cerrado nada en esta sesión.</li></ul>
-        <div class="foot"><span>Made by <b>AXE</b></span><button class="link" id="openLog">Abrir log.txt</button></div>
+        <ul class="log" id="log" aria-live="polite" aria-label="Registro de esta sesión"><li class="empty">Aún no has cerrado nada en esta sesión.</li></ul>
+        <div class="foot"><span>Made by <b translate="no">AXE</b></span><button class="link" id="openLog">Abrir log.txt</button></div>
       </section>
     </div>
   </main>
+</div>
+<div class="toast" id="toast" aria-hidden="true">
+  <span class="ti"><svg viewBox="0 0 24 24"><path class="ck" d=""/></svg></span>
+  <div><b id="toastT"></b><small id="toastS"></small></div>
 </div>
 <script>
 "use strict";
@@ -217,55 +327,178 @@ const GROUPS=[["steam","Steam"],["epic","Epic Games"],["razer","Razer"]];
 const $=id=>document.getElementById(id);
 const send=o=>window.chrome.webview.postMessage(JSON.stringify(o));
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const mb=b=>b>=1073741824?(b/1073741824).toFixed(1)+" GB":Math.round(b/1048576)+" MB";
-let busy=false, tally={ok:0,er:0,sk:0};
+// Cifras en formato español con espacio duro antes de la unidad: "1,3\u00a0GB".
+const NB="\u00a0", nf1=new Intl.NumberFormat("es-ES",{maximumFractionDigits:1}), nf0=new Intl.NumberFormat("es-ES",{maximumFractionDigits:0});
+const mb=b=>b>=1073741824?nf1.format(b/1073741824)+NB+"GB":nf0.format(b/1048576)+NB+"MB";
+const procs=n=>n+NB+(n===1?"proceso":"procesos");
+const reduced=false; // ver nota en el CSS
+let busy=false, lastTotal=0, tally={ok:0,er:0,sk:0}, closing=null, pending=null, spinUntil=0;
+const EMPTY='<svg class="eck" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>No hay nada abierto.';
 
 const t0=Date.now();
 setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);$("clock").textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")},1000);
 
-function pill(kind,text){$("pill").className="pill"+(kind?" "+kind:"");$("pillT").textContent=text}
+/* ---------- utilidades de movimiento ---------- */
+// Numero que cuenta hasta su valor nuevo (ease-out), sin saltos.
+const tweens=new WeakMap();
+function countTo(el,to,fmt){
+  fmt=fmt||(v=>String(Math.round(v)));
+  const from=parseFloat(el.dataset.v||"0"); el.dataset.v=to;
+  if(from===to){el.textContent=fmt(to);return}
+  if(reduced){el.textContent=fmt(to);return}
+  cancelAnimationFrame(tweens.get(el));
+  const t1=performance.now(), d=Math.min(700,260+Math.abs(to-from)*30);
+  const step=t=>{const k=Math.min(1,(t-t1)/d), e=1-Math.pow(1-k,4);
+    el.textContent=fmt(from+(to-from)*e); if(k<1) tweens.set(el,requestAnimationFrame(step))};
+  tweens.set(el,requestAnimationFrame(step));
+}
+// Texto que cambia con fundido corto (solo si cambia de verdad).
+function swapText(el,text){
+  if(el.textContent===text) return;
+  if(reduced){el.textContent=text;return}
+  el.classList.add("out");
+  clearTimeout(el._sw);
+  el._sw=setTimeout(()=>{el.textContent=text;el.classList.remove("out")},150);
+}
+function pill(kind,text){$("pill").className="pill"+(kind?" "+kind:"");swapText($("pillT"),text)}
+// FLIP: mide, cambia el DOM y anima a los hermanos desde donde estaban (sin saltos al quitar una fila).
+function flip(parent,mutate){
+  const first=new Map([...parent.children].map(k=>[k,k.getBoundingClientRect().top]));
+  mutate();
+  for(const k of parent.children){
+    const f=first.get(k); if(f==null) continue;
+    const dy=f-k.getBoundingClientRect().top; if(!dy) continue;
+    k.style.transition="none"; k.style.transform="translateY("+dy+"px)"; void k.offsetWidth;
+    k.style.transition=""; k.style.transform="";
+  }
+}
+// Aviso flotante: entra con muelle, el icono se dibuja, sale solo.
+let toastTimer=0;
+function toast(kind,title,sub){
+  const t=$("toast"); clearTimeout(toastTimer);
+  t.classList.remove("on"); t.classList.toggle("er",kind==="er");
+  $("toastT").textContent=title; $("toastS").textContent=sub;
+  t.querySelector(".ck").setAttribute("d",kind==="er"?"M8 8l8 8M16 8l-8 8":"M5 12.5l4.5 4.5L19 7.5");
+  void t.offsetWidth; t.classList.add("on");
+  toastTimer=setTimeout(()=>t.classList.remove("on"),3800);
+}
+const memOf=ids=>ids.reduce((s,id)=>s+(+cards[id].mem.dataset.v||0),0);
+// Foco de luz bajo el cursor (una lectura por frame).
+let spotE=null, spotRaf=0;
+document.addEventListener("pointermove",e=>{spotE=e; if(spotRaf) return; spotRaf=requestAnimationFrame(()=>{
+  spotRaf=0; const c=spotE.target.closest&&spotE.target.closest(".card"); if(!c) return;
+  const r=c.getBoundingClientRect();
+  c.style.setProperty("--mx",(spotE.clientX-r.left)+"px"); c.style.setProperty("--my",(spotE.clientY-r.top)+"px");
+})},{passive:true});
+
+/* ---------- tarjetas: se crean una vez y se actualizan en su sitio ---------- */
+const cards={};
+for(const [id,name] of GROUPS){
+  const el=$("g-"+id);
+  el.innerHTML='<div class="ghead"><h2 translate="no">'+name+'</h2><span class="state"><span class="swap">cerrado</span></span></div>'
+    +'<div><div class="count"><span class="v">0</span><span class="l swap">procesos</span></div>'
+    +'<div class="mem">0 MB de RAM</div></div>'
+    +'<ul class="procs"><li class="empty">'+EMPTY+'</li></ul>'
+    +'<button class="btn danger small" data-close="'+id+'" data-label="Cerrar '+name+'" disabled><b>Cerrar '+name+'</b></button>';
+  cards[id]={el,state:el.querySelector(".state"),stateT:el.querySelector(".state .swap"),v:el.querySelector(".v"),
+    l:el.querySelector(".l"),mem:el.querySelector(".mem"),list:el.querySelector(".procs"),btn:el.querySelector("[data-close]"),rows:new Map()};
+}
+
+// Lista de procesos con entradas y salidas animadas por nombre.
+function renderList(c,procs){
+  const shown=procs.slice(0,6), keep=new Set();
+  const empty=c.list.querySelector(".empty:not(.more)");
+  for(const p of shown){
+    keep.add(p.name);
+    let li=c.rows.get(p.name);
+    const label=p.prot?"protegido":"×"+p.count;
+    if(!li){
+      li=document.createElement("li");
+      li.innerHTML='<span translate="no" title="'+esc(p.name)+'">'+esc(p.name)+'</span><span class="x"></span>';
+      li.classList.add("enter");
+      c.list.appendChild(li); c.rows.set(p.name,li);
+      requestAnimationFrame(()=>requestAnimationFrame(()=>li.classList.remove("enter")));
+    }
+    li.classList.toggle("prot",!!p.prot);
+    li.querySelector(".x").textContent=label;
+  }
+  for(const [name,li] of c.rows){
+    if(keep.has(name)) continue;
+    c.rows.delete(name);
+    li.classList.add("leave");
+    setTimeout(()=>flip(c.list,()=>li.remove()),200);
+  }
+  const more=procs.length-shown.length;
+  let tail=c.list.querySelector(".more");
+  if(more>0){ if(!tail){tail=document.createElement("li");tail.className="empty more";c.list.appendChild(tail)} tail.textContent="y "+more+" más" }
+  else if(tail) tail.remove();
+  if(procs.length===0){ if(!empty){const e=document.createElement("li");e.className="empty";e.innerHTML=EMPTY;
+      e.style.opacity=0;c.list.appendChild(e);setTimeout(()=>{e.style.transition="opacity .3s ease";e.style.opacity=1},200)} }
+  else if(empty) empty.remove();
+}
 
 function renderScan(d){
   $("c-admin").hidden=!d.admin;
   $("admin").hidden=d.admin;
   let total=0,mem=0;
-  for(const [id,name] of GROUPS){
-    const g=d.groups.find(x=>x.id===id)||{procs:[],total:0,closable:0,mem:0};
+  for(const [id] of GROUPS){
+    const g=d.groups.find(x=>x.id===id)||{procs:[],total:0,closable:0,mem:0}, c=cards[id];
     total+=g.closable; mem+=g.mem;
-    $("n-"+id).textContent=g.closable;
+    countTo($("n-"+id),g.closable);
     document.querySelector('[data-go="'+id+'"]').classList.toggle("on",g.closable>0);
-    const el=$("g-"+id);
-    el.classList.toggle("idle",g.closable===0);
-    const rows=g.procs.length?g.procs.slice(0,6).map(p=>'<li class="'+(p.prot?"prot":"")+'"><span>'+esc(p.name)+'</span><span class="x">'+(p.prot?"protegido":"×"+p.count)+'</span></li>').join("")
-      +(g.procs.length>6?'<li class="empty">y '+(g.procs.length-6)+' más</li>':""):'<li class="empty">No hay nada abierto.</li>';
-    el.innerHTML='<div class="ghead"><h3>'+name+'</h3><span class="state '+(g.closable?"on":"")+'">'+(g.closable?"abierto":"cerrado")+'</span></div>'
-      +'<div><div class="count"><span class="v">'+g.closable+'</span><span class="l">'+(g.closable===1?"proceso":"procesos")+'</span></div>'
-      +'<div class="mem">'+mb(g.mem)+' de RAM</div></div>'
-      +'<ul class="procs">'+rows+'</ul>'
-      +'<button class="btn danger small" data-close="'+id+'"'+(g.closable&&!busy?"":" disabled")+'><b>Cerrar '+name+'</b></button>';
+    c.el.classList.toggle("live",g.closable>0);
+    c.state.classList.toggle("on",g.closable>0);
+    swapText(c.stateT,g.closable?"abierto":"cerrado");
+    countTo(c.v,g.closable);
+    swapText(c.l,g.closable===1?"proceso":"procesos");
+    countTo(c.mem,g.mem,v=>mb(v)+" de RAM");
+    renderList(c,g.procs);
+    c.btn.disabled=!(g.closable&&!busy);
   }
-  $("c-total").className="chip"+(total?" hot":"");
-  $("c-total").innerHTML="Procesos <b>"+total+"</b>";
-  $("c-mem").innerHTML="RAM <b>"+mb(mem)+"</b>";
+  $("c-total").classList.toggle("hot",total>0);
+  countTo($("c-total-n"),total);
+  countTo($("c-mem"),mem,mb);
   $("closeAll").disabled=busy||total===0;
-  $("closeAllSub").textContent=total?total+(total===1?" proceso":" procesos")+" · libera "+mb(mem):"Nada que cerrar";
+  if(!$("closeAll").classList.contains("armed")) swapText($("closeAllSub"),total?procs(total)+" · libera "+mb(mem):"Nada que cerrar");
+  lastTotal=total;
   if(!busy) total?pill("hot",total+(total===1?" abierto":" abiertos")):pill("","Todo cerrado");
+  if(spinUntil){const left=spinUntil-Date.now(); spinUntil=0; setTimeout(()=>$("refresh").classList.remove("spin"),Math.max(0,left))}
+  if(pending){showOutcome(pending); pending=null}
+}
+
+// Resultado de un cierre, ya con la memoria medida despues: tarjetas limpias en verde y aviso.
+function showOutcome(p){
+  const freed=Math.max(0,p.before-memOf(p.ids));
+  for(const id of p.ids){const c=cards[id]; if(c.el.classList.contains("live")) continue;
+    c.el.classList.add("done"); clearTimeout(c.el._dn); c.el._dn=setTimeout(()=>c.el.classList.remove("done"),1400)}
+  if(p.er) toast("er",p.er+(p.er===1?" proceso no se pudo cerrar":" procesos no se pudieron cerrar"),
+    $("admin").hidden?"Revisa el registro":"Prueba a reiniciar como administrador");
+  else if(p.ok) toast("ok",procs(p.ok)+(p.ok===1?" cerrado":" cerrados"),
+    (freed?"Liberados "+mb(freed):"Memoria liberada")+(p.sk?" · "+p.sk+" protegidos":""));
+  else toast("ok","Nada que cerrar",p.sk?procs(p.sk)+" protegidos":"Ya estaba todo cerrado");
 }
 
 function renderResult(r){
   busy=false;
   const ul=$("log");
   const empty=ul.querySelector(".empty"); if(empty) empty.remove();
-  if(!r.items.length){
-    ul.insertAdjacentHTML("afterbegin",'<li><span class="tag sk">--</span><span>Nada que cerrar</span><span class="why">ya estaba cerrado</span></li>');
-  }
   const map={ok:["ok","OK"],err:["er","ER"],skip:["sk","--"]};
-  for(const it of r.items.slice().reverse()){
+  const items=r.items.length?r.items:[{status:"skip",name:"Nada que cerrar",why:"ya estaba cerrado",n:0}];
+  items.slice().reverse().forEach((it,i)=>{
     const [cls,txt]=map[it.status];
-    tally[cls]+=it.n||1;
-    ul.insertAdjacentHTML("afterbegin",'<li><span class="tag '+cls+'">'+txt+'</span><span>'+esc(it.name)+'</span><span class="why">'+esc(it.why||"")+'</span></li>');
-  }
-  $("t-ok").textContent=tally.ok;$("t-er").textContent=tally.er;$("t-sk").textContent=tally.sk;
+    tally[cls]+=it.n||0;
+    const li=document.createElement("li");
+    li.className="enter";
+    li.innerHTML='<span class="tag '+cls+'">'+txt+'</span><span>'+esc(it.name)+'</span><span class="why">'+esc(it.why||"")+'</span>';
+    ul.insertBefore(li,ul.firstChild);
+    // escalonado corto: las filas caen en cascada
+    setTimeout(()=>li.classList.remove("enter"),30+i*40);
+  });
+  const got={ok:0,er:0,sk:0};
+  for(const it of r.items) got[map[it.status][0]]+=it.n||0;
+  for(const k of ["ok","er","sk"]){ countTo($("t-"+k),tally[k]);
+    if(got[k]){const ch=$("c-"+k); ch.classList.remove("pop"); void ch.offsetWidth; ch.classList.add("pop")} }
+  if(closing){pending={ids:closing.ids,before:closing.before,ok:got.ok,er:got.er,sk:got.sk}; closing=null}
   for(const b of document.querySelectorAll(".btn.busy")) b.classList.remove("busy");
   send({cmd:"scan"});
 }
@@ -273,19 +506,47 @@ function renderResult(r){
 function close(group,btn){
   if(busy) return;
   busy=true; pill("busy","Cerrando…");
+  const ids=group==="all"?GROUPS.map(g=>g[0]):[group];
+  closing={ids,before:memOf(ids)};
   if(btn) btn.classList.add("busy");
-  for(const b of document.querySelectorAll("[data-close],#closeAll")) b.disabled=true;
+  for(const b of document.querySelectorAll("[data-close],#closeAll")) if(b!==btn) b.disabled=true;
   send({cmd:"close",group});
 }
 
-document.addEventListener("click",e=>{
-  const c=e.target.closest("[data-close]"); if(c&&!c.disabled) close(c.dataset.close,c);
-  const n=e.target.closest("[data-go]");
-  if(n){const el=$("g-"+n.dataset.go);el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),700)}
+/* ---------- confirmacion en el boton: cerrar procesos no se puede deshacer ---------- */
+let armedBtn=null, armTimer=0;
+function disarm(){
+  if(!armedBtn) return;
+  const b=armedBtn; armedBtn=null; clearTimeout(armTimer);
+  b.classList.remove("armed");
+  if(b.id==="closeAll") swapText($("closeAllSub"),lastTotal?procs(lastTotal)+" · libera "+$("c-mem").textContent:"Nada que cerrar");
+  else swapText(b.querySelector("b"),b.dataset.label);
+}
+function confirmThen(btn,text,fn){
+  if(armedBtn===btn){disarm();fn();return}
+  disarm();
+  armedBtn=btn; btn.classList.add("armed");
+  swapText(btn.id==="closeAll"?$("closeAllSub"):btn.querySelector("b"),text);
+  armTimer=setTimeout(disarm,3000);
+}
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape") disarm();
+  else if((e.key==="r"||e.key==="R"||e.key==="F5")&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&!e.repeat){e.preventDefault();$("refresh").click()}
 });
-document.addEventListener("keydown",e=>{const n=e.target.closest&&e.target.closest("[data-go]");if(n&&(e.key==="Enter"||e.key===" ")){e.preventDefault();n.click()}});
-$("closeAll").onclick=()=>close("all",$("closeAll"));
-$("refresh").onclick=()=>{if(!busy){pill("busy","Buscando…");send({cmd:"scan"})}};
+
+document.addEventListener("click",e=>{
+  const c=e.target.closest("[data-close]");
+  if(c&&!c.disabled&&!busy){
+    const n=parseInt(cards[c.dataset.close].v.dataset.v||"0",10);
+    confirmThen(c,"Pulsa otra vez · "+procs(n),()=>close(c.dataset.close,c));
+  }
+  if(armedBtn&&!e.target.closest(".armed")&&!c) disarm();
+  const n=e.target.closest("[data-go]");
+  if(n){const el=$("g-"+n.dataset.go);el.scrollIntoView({behavior:reduced?"auto":"smooth",block:"center"});
+    el.classList.add("flash");clearTimeout(el._fl);el._fl=setTimeout(()=>el.classList.remove("flash"),650)}
+});
+$("closeAll").onclick=()=>{if(!$("closeAll").disabled&&!busy) confirmThen($("closeAll"),"Pulsa otra vez para cerrar "+procs(lastTotal),()=>close("all",$("closeAll")))};
+$("refresh").onclick=()=>{if(!busy){pill("busy","Buscando…");$("refresh").classList.add("spin");spinUntil=Date.now()+700;send({cmd:"scan"})}};
 $("admin").onclick=()=>send({cmd:"elevate"});
 $("openLog").onclick=()=>send({cmd:"openLog"});
 
@@ -295,6 +556,9 @@ window.chrome.webview.addEventListener("message",e=>{
   else if(d.type==="result") renderResult(d);
 });
 setInterval(()=>{if(!busy&&!document.hidden) send({cmd:"scan"})},3000);
+window.axeIntroStage=()=>document.body.classList.remove("intro");
+window.axeIntroDone=()=>{document.body.classList.remove("intro");setTimeout(()=>document.body.classList.remove("intro-brand"),60)};
+setTimeout(()=>window.axeIntroDone(),20000);
 send({cmd:"scan"});
 </script>
 </body></html>

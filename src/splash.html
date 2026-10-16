@@ -1,0 +1,224 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>AXE</title>
+<style>
+/* Loader en ventana pequeña con la animacion del de Flow: rejilla de puntos, el icono entra en piezas
+   con estela, onda de puntos, el nombre se escribe, barra fina y fundido al panel. Acento rojo AXE. */
+:root{
+  --veil:#111013;
+  --fg:#ECEAEE; --label:#A39FA9; --faint:#8F8A96;
+  --accent:#E5484D; --track:rgba(255,255,255,.07);
+  --ui:"Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{color-scheme:dark}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--veil);cursor:default;user-select:none}
+body{font-family:var(--ui);color:var(--fg);-webkit-font-smoothing:antialiased}
+
+.veil{position:fixed;inset:0;background:var(--veil);opacity:0;transition:opacity .32s ease}
+.veil.on{opacity:1}
+.veil.off{opacity:0;transition:opacity .5s ease}
+canvas{position:fixed;inset:0;width:100%;height:100%;opacity:0;transition:opacity .4s ease}
+canvas.on{opacity:1}
+canvas.off{opacity:0;transition:opacity .35s ease}
+
+/* bloque central: [icono] NOMBRE, y debajo barra + etiquetas */
+.stack{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .28s ease,filter .28s ease,transform .32s cubic-bezier(.23,1,.32,1)}
+.stack.off{opacity:0;filter:blur(4px);transform:scale(.97)}
+.brand{position:relative;display:flex;align-items:center}
+/* halo rojo detras del logo: aparece al encajar la X y late con la onda */
+.bloom{position:absolute;left:50%;top:50%;width:440px;height:230px;margin:-115px 0 0 -220px;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(229,72,77,.24),rgba(229,72,77,.07) 55%,transparent);
+  opacity:0;transform:scale(.6);transition:opacity .9s ease,transform 1.2s cubic-bezier(.23,1,.32,1)}
+.bloom.on{opacity:1;transform:none}
+.bloom.flare{animation:flare .9s cubic-bezier(.23,1,.32,1)}
+@keyframes flare{35%{transform:scale(1.14)}}
+/* golpe al encajar las piezas */
+.mark.hit{animation:hit .5s cubic-bezier(.23,1,.32,1)}
+@keyframes hit{30%{transform:scale(1.035)}}
+.mark{position:relative;width:240px;height:86px}
+.mark svg{position:absolute;inset:0;width:240px;height:86px;overflow:visible}
+.mark .piece{opacity:0}
+.mark .piece.fly{animation:fly .62s cubic-bezier(.16,.84,.3,1) forwards}
+.mark .ghost.fly{animation:flyGhost .62s cubic-bezier(.16,.84,.3,1) forwards}
+@keyframes fly{0%{opacity:0;transform:translateX(-46vw)}12%{opacity:1}100%{opacity:1;transform:none}}
+@keyframes flyGhost{0%{opacity:0;transform:translateX(-46vw)}12%{opacity:var(--o)}80%{opacity:var(--o)}100%{opacity:0;transform:none}}
+
+/* cursor que acompaña a la E mientras se "escribe" */
+.caret{position:absolute;top:10px;bottom:10px;width:2px;background:var(--fg);left:0;opacity:0;animation:blink .6s steps(1) infinite}
+.caret.on{opacity:1}
+@keyframes blink{50%{background:transparent}}
+
+.load{width:230px;margin-top:28px;opacity:0;transition:opacity .3s ease}
+.load.on{opacity:1}
+.load.off{opacity:0;transition:opacity .22s ease}
+.track{height:2px;background:var(--track);border-radius:2px;overflow:hidden}
+.fill{position:relative;height:100%;width:100%;background:var(--accent);border-radius:2px;overflow:hidden;
+  clip-path:inset(0 100% 0 0);transition:clip-path .55s cubic-bezier(.23,1,.32,1)}
+/* brillo que recorre la barra mientras carga */
+.fill::after{content:"";position:absolute;top:0;bottom:0;left:0;width:40%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);transform:translateX(-100%);animation:shim 1.3s linear infinite}
+@keyframes shim{to{transform:translateX(260%)}}
+.meta{display:flex;justify-content:space-between;margin-top:10px;font-size:12px}
+.meta .step{color:var(--label)}
+.meta .pct{color:var(--faint);font-size:11px;font-variant-numeric:tabular-nums}
+
+/* Sin variante de movimiento reducido a proposito: el usuario lo pidio. Windows lo activa al quitar
+   los "efectos de animacion" (ajuste habitual para rendimiento en juegos) y dejaba la app casi sin movimiento. */
+</style></head>
+<body>
+<div class="veil" id="veil"></div>
+<canvas id="dots"></canvas>
+<div class="stack" id="stack">
+  <div class="brand" id="brand">
+    <div class="bloom" id="bloom"></div>
+    <div class="mark" id="mark"><div class="caret" id="caret"></div></div>
+  </div>
+  <div class="load" id="load">
+    <div class="track" id="track" role="progressbar" aria-label="Cargando" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill" id="fill"></div></div>
+    <div class="meta"><span class="step" id="step" aria-live="polite">Iniciando…</span><span class="pct" id="pct" aria-hidden="true">0%</span></div>
+  </div>
+</div>
+<template id="logo">%%BRANDMARK%%</template>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const send=m=>window.chrome.webview.postMessage(m);
+
+/* ---------- rejilla de puntos ---------- */
+const cv=$("dots"), cx=cv.getContext("2d");
+let W=0,H=0,dpr=1,pts=[],wave=null;
+// luz que sigue al raton por la rejilla (suavizada)
+let mx=-999,my=-999,lx=-999,ly=-999;
+addEventListener("pointermove",e=>{if(lx<-900){lx=e.clientX;ly=e.clientY} mx=e.clientX;my=e.clientY});
+document.documentElement.addEventListener("mouseleave",()=>{mx=my=lx=ly=-999});
+const GAP=30, REDUCED=false; // ver nota en el CSS
+function layout(){
+  dpr=window.devicePixelRatio||1; W=innerWidth; H=innerHeight;
+  cv.width=W*dpr; cv.height=H*dpr; cx.setTransform(dpr,0,0,dpr,0,0);
+  pts=[]; const ox=(W/2)%GAP, oy=(H/2)%GAP;
+  for(let y=oy;y<H;y+=GAP) for(let x=ox;x<W;x+=GAP){
+    const d=Math.hypot(x-W/2,y-H/2);
+    // los puntos encendidos se concentran en un anillo alrededor del logo, como en Flow
+    const ring=Math.exp(-Math.pow((d-150)/55,2));
+    pts.push({x,y,d,lit:Math.random()<ring*.3,ph:Math.random()*Math.PI*2,sp:.6+Math.random()*1.2});
+  }
+}
+function draw(t){
+  cx.clearRect(0,0,W,H);
+  if(mx>-900){lx+=(mx-lx)*.18;ly+=(my-ly)*.18}
+  for(const p of pts){
+    let a=.07, lit=0;
+    if(lx>-900){const q=((p.x-lx)*(p.x-lx)+(p.y-ly)*(p.y-ly))/7200; if(q<9) lit=Math.exp(-q)*.5}
+    if(p.lit) lit=Math.max(lit,.25+.45*(.5+.5*Math.sin(t/1000*p.sp+p.ph)));
+    if(wave){
+      const r=(t-wave)/700*Math.hypot(W,H)*.35;
+      const k=Math.exp(-Math.pow((p.d-r)/38,2))*Math.max(0,1-(t-wave)/900);
+      lit=Math.max(lit,k);
+    }
+    if(lit>.02){cx.fillStyle="rgba(238,93,98,"+Math.min(1,lit*1.05).toFixed(3)+")";cx.fillRect(p.x-1.4,p.y-1.4,2.8,2.8)}
+    else{cx.fillStyle="rgba(255,255,255,"+a+")";cx.fillRect(p.x-.8,p.y-.8,1.6,1.6)}
+  }
+  // con movimiento reducido se pinta una vez, sin parpadeo ni onda
+  if(!REDUCED) requestAnimationFrame(draw);
+}
+layout(); addEventListener("resize",layout); requestAnimationFrame(draw);
+
+/* ---------- logo AXE real, por piezas ---------- */
+// Paths del brandmark: 0 = A, 1 = E, 2 = X arriba, 3 = X abajo, 4 = hueco de la A.
+const VB="40 330 2460 880", NS="http://www.w3.org/2000/svg";
+const src=[...$("logo").content.querySelectorAll("path")].map(p=>p.getAttribute("d"));
+const GRAD='<defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="40" y1="330" x2="2500" y2="1210">'
+  +'<stop offset="0" stop-color="#FF9A9D"/><stop offset=".5" stop-color="#EE5D62"/><stop offset="1" stop-color="#C7343A"/></linearGradient></defs>';
+function piece(paths,cls){
+  const svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("viewBox",VB); svg.setAttribute("class","piece "+cls);
+  svg.innerHTML=GRAD+paths.map(([i,fill])=>'<path fill="'+fill+'" d="'+src[i]+'"/>').join("");
+  $("mark").insertBefore(svg,$("caret"));
+  return svg;
+}
+// A y E se descubren con un recorte que crece desde la X hacia fuera.
+function revealed(paths,id){
+  const svg=piece(paths,"static");
+  svg.style.opacity=1;
+  svg.insertAdjacentHTML("afterbegin",'<clipPath id="'+id+'"><rect y="300" height="950" x="0" width="0"/></clipPath>');
+  svg.querySelectorAll("path").forEach(p=>p.setAttribute("clip-path","url(#"+id+")"));
+  return svg.querySelector("rect");
+}
+const clipA=revealed([[0,"url(#g)"],[4,"#111013"]],"ca");
+const clipE=revealed([[1,"url(#g)"]],"ce");
+clipA.setAttribute("x",898); clipE.setAttribute("x",1822);
+// X: por cada pieza, dos fantasmas (estela) y la pieza real encima
+for(const i of [2,3]) for(const o of [.16,.34,1]){
+  const svg=piece([[i,"url(#g)"]], o<1?"ghost":"");
+  svg.style.setProperty("--o",o); svg.dataset.piece=i; svg.dataset.o=o;
+}
+// pasada de brillo sobre el logo terminado
+const shine=piece([[0,"url(#sh)"],[1,"url(#sh)"],[2,"url(#sh)"],[3,"url(#sh)"],[4,"#111013"]],"static shine");
+shine.insertAdjacentHTML("afterbegin",'<defs><linearGradient id="sh" gradientUnits="userSpaceOnUse" x1="0" y1="760" x2="560" y2="600">'
+  +'<stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".7"/>'
+  +'<stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>');
+const shineG=shine.querySelector("#sh");
+function tween(ms,fn){return new Promise(res=>{const t0=performance.now();(function f(t){const k=Math.min(1,(t-t0)/ms);fn(1-Math.pow(1-k,3));k<1?requestAnimationFrame(f):res()})(t0)})}
+
+/* ---------- secuencia ---------- */
+let target=0, shown=0, ready=false, leaving=false;
+async function sweep(){
+  shine.style.opacity=1;
+  await tween(950,k=>shineG.setAttribute("gradientTransform","translate("+(-700+3500*k)+" 0)"));
+  shine.style.opacity=0;
+}
+async function shineLoop(){ while(!leaving){ await sweep(); await wait(2300) } }
+setInterval(()=>{if(shown<target){shown=Math.min(target,shown+Math.max(1,Math.ceil((target-shown)/5)));$("pct").textContent=shown+"%"}},28);
+
+async function intro(){
+  $("veil").classList.add("on"); $("dots").classList.add("on");
+  await wait(380);
+  // piezas: arriba primero, abajo despues; estela mas retrasada que la pieza
+  for(const svg of $("mark").querySelectorAll("svg[data-piece]")){
+    const delay=(svg.dataset.piece==="3"?120:0)+(svg.dataset.o==="1"?0:svg.dataset.o==="0.34"?-35:-70);
+    setTimeout(()=>svg.classList.add("fly"),Math.max(0,delay+70));
+  }
+  setTimeout(()=>{$("mark").classList.add("hit");$("bloom").classList.add("on")},700);
+  await wait(820);
+  wave=performance.now(); $("bloom").classList.add("flare");
+  await wait(380);
+  // la A sale de la X hacia la izquierda y la E hacia la derecha, con cursor
+  await tween(320,k=>{clipA.setAttribute("x",898-835*k);clipA.setAttribute("width",835*k)});
+  const caret=$("caret"), px=240/2460; caret.classList.add("on");
+  await tween(360,k=>{clipE.setAttribute("width",655*k);caret.style.left=((1822-40)+655*k)*px+4+"px"});
+  await wait(300); caret.classList.remove("on");
+  $("load").classList.add("on");
+  shineLoop();
+  ready=true; send("intro-done");
+}
+
+window.chrome.webview.addEventListener("message",async e=>{
+  const d=e.data;
+  if(d.type==="step"){
+    $("step").textContent=d.text; target=d.pct; $("fill").style.clipPath="inset(0 "+(100-d.pct)+"% 0 0)"; $("track").setAttribute("aria-valuenow",d.pct);
+  } else if(d.type==="fly"){
+    await finish();
+  }
+});
+
+// Final: se apaga la barra, se funde el bloque y la rejilla, y el panel toma el relevo.
+async function finish(){
+  leaving=true;
+  $("load").classList.add("off");
+  await wait(200);
+  $("stack").classList.add("off"); $("dots").classList.add("off");
+  await wait(340);
+  send("flown");
+}
+
+// Arrastrar la ventana desde cualquier punto.
+addEventListener("mousedown",e=>{if(e.button===0) send("drag")});
+// Esc salta la animacion de entrada (el foco del teclado lo tiene la pagina, no la ventana WPF).
+addEventListener("keydown",e=>{if(e.key==="Escape") send("skip")});
+
+intro();
+send("ready");
+</script>
+</body></html>

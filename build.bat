@@ -10,7 +10,7 @@ set "FW=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319"
   /resource:lib\Microsoft.Web.WebView2.Core.dll,Microsoft.Web.WebView2.Core.dll ^
   /resource:lib\Microsoft.Web.WebView2.Wpf.dll,Microsoft.Web.WebView2.Wpf.dll ^
   /resource:lib\WebView2Loader.dll,WebView2Loader.dll ^
-  /resource:src\ui.html,ui.html ^
+  /resource:src\ui.html,ui.html /resource:src\splash.html,splash.html /resource:src\xmark.svg,xmark.svg ^
   /resource:src\brandmark.svg,brandmark.svg ^
   /resource:"Cerrar Steam y Epic.bat",script.bat ^
   /out:"Cerrar Steam y Epic.exe" src\App.cs
